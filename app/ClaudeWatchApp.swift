@@ -27,6 +27,9 @@ struct AgentSession: Identifiable, Sendable {
     let waitingFor: String  // e.g. "permission prompt" when state == waiting
 }
 
+/// A simple error wrapper — Result's failure type must conform to Error.
+struct PollError: Error { let message: String }
+
 @MainActor
 final class SessionStore: ObservableObject {
     static let shared = SessionStore()
@@ -64,10 +67,10 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    private func apply(_ result: Result<[AgentSession], String>) {
+    private func apply(_ result: Result<[AgentSession], PollError>) {
         switch result {
-        case .failure(let msg):
-            lastError = msg
+        case .failure(let err):
+            lastError = err.message
         case .success(let agents):
             lastError = nil
             sessions = agents.sorted { Self.order($0.state) < Self.order($1.state) }
@@ -99,7 +102,7 @@ final class SessionStore: ObservableObject {
 
     /// Run `claude agents --json` and parse it. nonisolated so it can run on a
     /// background task. Uses a login shell so `claude` (in ~/.local/bin) is found.
-    nonisolated static func runClaudeAgents() -> Result<[AgentSession], String> {
+    nonisolated static func runClaudeAgents() -> Result<[AgentSession], PollError> {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
         proc.arguments = ["-lc", "claude agents --json"]
@@ -107,7 +110,7 @@ final class SessionStore: ObservableObject {
         proc.standardOutput = out
         proc.standardError = Pipe()
         do { try proc.run() } catch {
-            return .failure("claude 起動失敗: \(error.localizedDescription)")
+            return .failure(PollError(message: "claude 起動失敗: \(error.localizedDescription)"))
         }
         let data = out.fileHandleForReading.readDataToEndOfFile()
         proc.waitUntilExit()
