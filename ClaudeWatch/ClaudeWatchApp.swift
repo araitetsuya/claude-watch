@@ -5,6 +5,7 @@
 //   • Notifier.swift    … 通知と PhpStorm 起動
 //   • AppDelegate.swift … 起動時の初期化・通知デリゲート
 //   • MenuContent.swift … メニューバーに出す View
+//   • DashboardView.swift … 開いて状態確認するウィンドウ
 
 import SwiftUI
 
@@ -20,5 +21,18 @@ struct ClaudeWatchApp: App {
             Image(systemName: store.needsAttention ? "bell.badge.fill" : "list.bullet.rectangle")
         }
         .menuBarExtraStyle(.window)
+
+        // 開いて状態確認するダッシュボード。メニューの「ダッシュボードを開く」や
+        // openWindow(id:) で表示する。起動時に勝手に開かないよう .suppressed。
+        Window("ClaudeWatch", id: DashboardWindow.id) {
+            DashboardView(store: store)
+        }
+        .defaultSize(width: 480, height: 600)
+        .defaultLaunchBehavior(.suppressed)
     }
+}
+
+/// openWindow(id:) で使うウィンドウ識別子。
+enum DashboardWindow {
+    static let id = "dashboard"
 }
