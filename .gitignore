@@ -1,19 +1,15 @@
 # macOS
 .DS_Store
 
-# Swift build output (build.sh writes here)
+# Xcode build output
+DerivedData/
 build/
 *.app
 
-# Xcode (once you migrate the app into an Xcode project)
-DerivedData/
+# Xcode user-specific state
 *.xcuserstate
 xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 
-# Python prototype runtime state / caches
-prototype/_state/
-__pycache__/
-*.pyc
 # JetBrains IDE
 .idea/

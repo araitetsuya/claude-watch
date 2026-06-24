@@ -1,55 +1,42 @@
 # claude-watch
 
 複数プロジェクトの Claude Code セッションを **1か所で見て、状態変化で通知し、クリックで
-IDE に飛ぶ**ためのデスク用ツール。`claude agents --json` を読むだけ（リポジトリには触れない）。
+IDE に飛ぶ**ための macOS メニューバーアプリ。`claude agents --json` を読むだけ（リポジトリには触れない）。
 
-> 通知の役割分担：**席にいる時はこのツール（Mac デスクトップ）**、**離席中はスマホ/Apple Watch
+> 通知の役割分担：**席にいる時はこのアプリ（Mac デスクトップ）**、**離席中はスマホ/Apple Watch
 > ＝ Claude Code 組み込み push（Remote Control 経由）** に任せる、という棲み分け。
+
+## 動かす
+
+Xcode で `ClaudeWatch.xcodeproj` を開いて **⌘R**。
+
+- 初回起動時に通知の許可を求められる → 許可
+- メニューバーにアイコンが出る → クリックで一覧 → 行クリックでプロジェクトを IDE で前面化
+- Dock には出さずメニューバー常駐（`LSUIElement`）
+
+`claude` をサブプロセス起動するため **App Sandbox は無効**にしている。
 
 ## 構成
 
 ```
-app/         ネイティブ macOS アプリ（Swift / SwiftUI MenuBarExtra）— 本命
-prototype/   Python 版（検証済みプロトタイプ。仕様の参照・記録）
+ClaudeWatch.xcodeproj      Xcode プロジェクト
+ClaudeWatch/               ソース
+├── ClaudeWatchApp.swift   @main / Scene 定義
+├── Model.swift            AgentSession / SessionStore（2秒ごとにポーリング・単一の真実）
+├── Notifier.swift         native 通知 + IDE 起動
+├── AppDelegate.swift      起動初期化・通知デリゲート
+└── MenuContent.swift      メニューバーに出す View
 ```
 
-### app/ — ネイティブアプリ（ClaudeWatch）
-
-メニューバー常駐。`claude agents --json` をポーリング → 一覧表示 → 状態が
-`waiting`/`blocked`/`done`/`failed` に遷移したら native 通知 → クリックで PhpStorm。
-
-- `app/ClaudeWatch/` … Xcode プロジェクト（本流。`app/XCODE.md` の手順で作成）
-- `app/swiftc/` … Xcode 無しでビルドする最小版（学習の出発点・CI 用）
-- `app/XCODE.md` … swiftc 版 → Xcode への移行手順
-
-Xcode 無しで素早く動かす場合：
-
-```bash
-cd app/swiftc
-bash build.sh          # build/ClaudeWatch.app を生成（Xcode 不要・ad-hoc 署名）
-open build/ClaudeWatch.app
-```
-
-### prototype/ — Python 版（参照）
-
-ロジックを最初に検証した版。常駐デーモン＋ターミナル表示＋通知。
-（当時の名前 `claude-dash` のまま。`~/.claude-dash` に常設済み・内部名も据え置き。）
-
-```bash
-cd prototype
-python3 daemon.py      # 本体（Ctrl+Cで停止）
-python3 view.py        # 一覧（別タブ）
-# 自動起動させる場合: bash install.sh  （launchd 登録）
-```
-
-> アプリ版と Python 版を**同時に常駐させない**こと（通知が二重になる）。
-> アプリへ移行したら Python 版の launchd は解除：
-> `launchctl unload ~/Library/LaunchAgents/com.claude-dash.daemon.plist`
+メニューバー常駐で `claude agents --json` をポーリング → 一覧表示 → 状態が
+`waiting`/`blocked`/`done`/`failed` に遷移したら native 通知 → クリックで IDE。
+状態管理は `@Observable`、ポーリングは async ループ、JSON は `Codable`。
 
 ## ステータス
 
-- [x] Python プロトタイプ（検証済み・`~/.claude-dash` に常設）
-- [x] ネイティブアプリ 第1マイルストーン：一覧＋native通知＋クリックでPhpStorm
+- [x] 第1マイルストーン：一覧＋native通知＋クリックで IDE
+- [ ] ダッシュボードウィンドウ（開いて状態確認できる）
+- [ ] ターミナルからの状態確認（CLI）
 - [ ] ログイン時自動起動（SMAppService）
 - [ ] メニューバーアイコンの状態反映の作り込み・設定画面
 - [ ] 配布（他Mac向けの署名）
