@@ -1,8 +1,8 @@
 # macOS
 .DS_Store
 
-# Swift build output (app/build.sh writes here)
-app/build/
+# Swift build output (build.sh writes here)
+build/
 *.app
 
 # Xcode (once you migrate the app into an Xcode project)

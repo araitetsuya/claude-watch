@@ -18,14 +18,17 @@ prototype/   Python 版（検証済みプロトタイプ。仕様の参照・記
 メニューバー常駐。`claude agents --json` をポーリング → 一覧表示 → 状態が
 `waiting`/`blocked`/`done`/`failed` に遷移したら native 通知 → クリックで PhpStorm。
 
+- `app/ClaudeWatch/` … Xcode プロジェクト（本流。`app/XCODE.md` の手順で作成）
+- `app/swiftc/` … Xcode 無しでビルドする最小版（学習の出発点・CI 用）
+- `app/XCODE.md` … swiftc 版 → Xcode への移行手順
+
+Xcode 無しで素早く動かす場合：
+
 ```bash
-cd app
+cd app/swiftc
 bash build.sh          # build/ClaudeWatch.app を生成（Xcode 不要・ad-hoc 署名）
 open build/ClaudeWatch.app
 ```
-
-Xcode で開発を続ける場合は、`app/ClaudeWatchApp.swift` を新規 macOS App ターゲットに
-取り込む（署名・capability は Xcode が面倒を見る）。
 
 ### prototype/ — Python 版（参照）
 
