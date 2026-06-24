@@ -60,8 +60,9 @@ struct DashboardView: View {
     }
 
     private func row(_ s: AgentSession) -> some View {
-        HStack(spacing: 10) {
-            Text(s.stateEmoji)
+        HStack(alignment: .top, spacing: 10) {
+            Circle().fill(s.statusColor).frame(width: 10, height: 10)
+                .padding(.top, 4)   // プロジェクト名の行に高さを合わせる
             VStack(alignment: .leading, spacing: 2) {
                 Text(s.project).font(.body).bold()
                 Text(s.detailText).font(.caption).foregroundStyle(.secondary)

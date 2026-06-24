@@ -1,9 +1,11 @@
-// View — メニューバーアイコンをクリックすると出るポップオーバーの中身。
+// View — メニューバーのネイティブメニュー（NSMenu）の中身。
 //
-//   • store を observe してセッション一覧を表示
-//   • 行をタップするとそのプロジェクトを PhpStorm で開く
-//   • 「ダッシュボードを開く」でウィンドウ表示（openWindow）
-//   • 状態絵文字・詳細は AgentSession の共有ヘルパー（Model.swift）を使う
+//   • MenuBarExtra のデフォルト（.menu）スタイルで使う想定。
+//     なので VStack や frame で囲わず、メニュー項目を直接並べる。
+//   • セッションは「色付きドット + プロジェクト名 · 状態」の1行項目（Docker の
+//     "● ... is running" に寄せる）。クリックで IDE を開く。
+//   • ドットは SF Symbol だとメニューで単色化されるため、色付きの丸を描いた
+//     「非テンプレート画像」を使って色を乗せる。
 
 import SwiftUI
 import AppKit
@@ -11,44 +13,56 @@ import AppKit
 struct MenuContent: View {
     var store: SessionStore
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("claude-watch").font(.headline)
+        if let err = store.lastError {
+            Text("⚠️ \(err)")
+        }
 
-            if let err = store.lastError {
-                Text(err).font(.caption).foregroundStyle(.red)
-            }
-
-            if store.sessions.isEmpty {
-                Text("アクティブなセッションはありません")
-                    .font(.callout).foregroundStyle(.secondary)
-            } else {
-                ForEach(store.sessions) { s in
-                    Button { openInPhpStorm(s.cwd) } label: {
-                        HStack(spacing: 8) {
-                            Text(s.stateEmoji).frame(width: 18)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(s.project).bold()
-                                Text(s.detailText).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
+        if store.sessions.isEmpty {
+            Text("アクティブなセッションはありません")
+        } else {
+            ForEach(store.sessions) { s in
+                Button { openInPhpStorm(s.cwd) } label: {
+                    Label {
+                        Text("\(s.state.uppercased())  \(s.project)")
+                    } icon: {
+                        Image(nsImage: Self.dot(NSColor(s.statusColor)))
                     }
-                    .buttonStyle(.plain)
                 }
             }
-
-            Divider()
-            Button("ダッシュボードを開く") {
-                openWindow(id: DashboardWindow.id)
-                dismiss()   // ポップオーバーを閉じる（.window スタイルは自動で閉じない）
-            }
-            Button("終了") { NSApplication.shared.terminate(nil) }
         }
-        .padding(12)
-        .frame(width: 320)
+
+        Divider()
+        Button("開く") { openWindow(id: DashboardWindow.id) }
+        Button("終了") { NSApplication.shared.terminate(nil) }
+    }
+
+    /// 色付きの丸を描いた非テンプレート画像（メニューで色が乗るように）。
+    private static func dot(_ color: NSColor, diameter: CGFloat = 9) -> NSImage {
+        // 行の縦中央に置く（ネイティブのメニューアイコンと同じ標準位置）。
+        // 無理にテキストへ揃えるとホバーの四角に対して中央からズレて見えるため、
+        // 中央のままにしておく。
+        let size = NSSize(width: diameter, height: diameter)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        color.setFill()
+        NSBezierPath(ovalIn: NSRect(origin: .zero, size: size)).fill()
+        image.unlockFocus()
+        image.isTemplate = false   // テンプレートにすると単色化されるので false
+        return image
+    }
+}
+
+extension AgentSession {
+    /// 状態を表すドットの色（メニュー・ダッシュボード共通）。
+    var statusColor: Color {
+        switch state {
+        case "blocked", "waiting": return .red
+        case "working", "busy":    return .blue
+        case "failed":             return .red
+        case "done":               return .green
+        default:                   return .secondary
+        }
     }
 }

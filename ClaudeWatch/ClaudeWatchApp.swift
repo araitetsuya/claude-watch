@@ -20,7 +20,8 @@ struct ClaudeWatchApp: App {
         } label: {
             Image(systemName: store.needsAttention ? "bell.badge.fill" : "list.bullet.rectangle")
         }
-        .menuBarExtraStyle(.window)
+        // .menuBarExtraStyle は付けない＝デフォルトのネイティブメニュー（NSMenu）。
+        // Docker などと同じ「標準メニュー＋フェード」の見た目になる。
 
         // 開いて状態確認するダッシュボード。メニューの「ダッシュボードを開く」や
         // openWindow(id:) で表示する。起動時に勝手に開かないよう .suppressed。
