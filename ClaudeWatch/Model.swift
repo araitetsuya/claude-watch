@@ -21,17 +21,6 @@ struct AgentSession: Identifiable, Sendable {
 }
 
 extension AgentSession {
-    /// Emoji indicator for the session state (shared by menu and dashboard).
-    var stateEmoji: String {
-        switch state {
-        case "blocked", "waiting": return "🔴"
-        case "working", "busy":    return "🔵"
-        case "failed":             return "❌"
-        case "done":               return "🟢"
-        default:                   return "⚪️"
-        }
-    }
-
     /// One-line detail: waitingFor > name > kind, falling back to the raw state.
     var detailText: String {
         let detail = !waitingFor.isEmpty ? waitingFor
