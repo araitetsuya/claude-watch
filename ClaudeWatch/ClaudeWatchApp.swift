@@ -1,0 +1,24 @@
+// ClaudeWatchApp — アプリのエントリポイント（@main）。
+//
+// ここには SwiftUI の Scene 定義だけを置く。中身は役割ごとに分割:
+//   • Model.swift       … データ（AgentSession / SessionStore）
+//   • Notifier.swift    … 通知と PhpStorm 起動
+//   • AppDelegate.swift … 起動時の初期化・通知デリゲート
+//   • MenuContent.swift … メニューバーに出す View
+
+import SwiftUI
+
+@main
+struct ClaudeWatchApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @State private var store = SessionStore.shared
+
+    var body: some Scene {
+        MenuBarExtra {
+            MenuContent(store: store)
+        } label: {
+            Image(systemName: store.needsAttention ? "bell.badge.fill" : "list.bullet.rectangle")
+        }
+        .menuBarExtraStyle(.window)
+    }
+}
