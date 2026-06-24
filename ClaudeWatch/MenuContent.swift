@@ -2,13 +2,16 @@
 //
 //   • store を observe してセッション一覧を表示
 //   • 行をタップするとそのプロジェクトを PhpStorm で開く
-//   • emoji / info は表示用のヘルパー
+//   • 「ダッシュボードを開く」でウィンドウ表示（openWindow）
+//   • 状態絵文字・詳細は AgentSession の共有ヘルパー（Model.swift）を使う
 
 import SwiftUI
 import AppKit
 
 struct MenuContent: View {
     var store: SessionStore
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -25,10 +28,10 @@ struct MenuContent: View {
                 ForEach(store.sessions) { s in
                     Button { openInPhpStorm(s.cwd) } label: {
                         HStack(spacing: 8) {
-                            Text(emoji(s.state)).frame(width: 18)
+                            Text(s.stateEmoji).frame(width: 18)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(s.project).bold()
-                                Text(info(s)).font(.caption).foregroundStyle(.secondary)
+                                Text(s.detailText).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                         }
@@ -39,25 +42,13 @@ struct MenuContent: View {
             }
 
             Divider()
+            Button("ダッシュボードを開く") {
+                openWindow(id: DashboardWindow.id)
+                dismiss()   // ポップオーバーを閉じる（.window スタイルは自動で閉じない）
+            }
             Button("終了") { NSApplication.shared.terminate(nil) }
         }
         .padding(12)
         .frame(width: 320)
-    }
-
-    private func emoji(_ state: String) -> String {
-        switch state {
-        case "blocked", "waiting": return "🔴"
-        case "working", "busy":    return "🔵"
-        case "failed":             return "❌"
-        case "done":               return "🟢"
-        default:                   return "⚪️"
-        }
-    }
-
-    private func info(_ s: AgentSession) -> String {
-        let detail = !s.waitingFor.isEmpty ? s.waitingFor
-                   : !s.name.isEmpty ? s.name : s.kind
-        return detail.isEmpty ? s.state : "\(s.state) · \(detail)"
     }
 }

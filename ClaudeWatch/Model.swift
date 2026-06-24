@@ -20,6 +20,26 @@ struct AgentSession: Identifiable, Sendable {
     let waitingFor: String  // e.g. "permission prompt" when state == waiting
 }
 
+extension AgentSession {
+    /// Emoji indicator for the session state (shared by menu and dashboard).
+    var stateEmoji: String {
+        switch state {
+        case "blocked", "waiting": return "🔴"
+        case "working", "busy":    return "🔵"
+        case "failed":             return "❌"
+        case "done":               return "🟢"
+        default:                   return "⚪️"
+        }
+    }
+
+    /// One-line detail: waitingFor > name > kind, falling back to the raw state.
+    var detailText: String {
+        let detail = !waitingFor.isEmpty ? waitingFor
+                   : !name.isEmpty ? name : kind
+        return detail.isEmpty ? state : "\(state) · \(detail)"
+    }
+}
+
 /// Raw shape of one element in `claude agents --json`. Keys are optional because
 /// the CLI uses a few aliases (id/sessionId, state/status) we normalise below.
 private struct AgentDTO: Decodable {
