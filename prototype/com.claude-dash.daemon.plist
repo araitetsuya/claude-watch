@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.claude-dash.daemon</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/tetsuyaarai/.claude-dash/daemon.py</string>
+    <string>--interval</string>
+    <string>2</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/tetsuyaarai/.claude-dash</string>
+
+  <!-- launchd has a minimal PATH; add where `claude` lives so the daemon can find it -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/tetsuyaarai/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>CLAUDE_DASH_DIR</key>
+    <string>/Users/tetsuyaarai/.claude-dash</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/tetsuyaarai/.claude-dash/daemon.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/tetsuyaarai/.claude-dash/daemon.log</string>
+</dict>
+</plist>
