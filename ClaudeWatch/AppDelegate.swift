@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
         Notifier.requestAuth()
+        LoginItem.shared.refresh()
         SessionStore.shared.start()
     }
 
