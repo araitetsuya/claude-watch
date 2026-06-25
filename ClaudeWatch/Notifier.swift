@@ -23,6 +23,9 @@ enum Notifier {
         case "failed":
             content.title = "❌ \(a.project) 失敗"
             content.body = a.name.isEmpty ? "セッション失敗" : a.name
+        case "idle":
+            content.title = "💬 \(a.project) 応答完了"
+            content.body = "入力待ち（あなたの番）"
         default:
             return
         }

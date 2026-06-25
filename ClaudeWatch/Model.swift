@@ -21,11 +21,9 @@ struct AgentSession: Identifiable, Sendable {
 }
 
 extension AgentSession {
-    /// One-line detail: waitingFor > name > kind, falling back to the raw state.
-    var detailText: String {
-        let detail = !waitingFor.isEmpty ? waitingFor
-                   : !name.isEmpty ? name : kind
-        return detail.isEmpty ? state : "\(state) · \(detail)"
+    /// 状態以外の補足（待ち理由 > 名前 > 種別）。状態は別に色付きで表示するため含めない。
+    var subtitle: String {
+        !waitingFor.isEmpty ? waitingFor : (!name.isEmpty ? name : kind)
     }
 }
 
@@ -58,6 +56,8 @@ final class SessionStore {
     /// you — discovered by testing the Python prototype.
     static let notifyStates: Set<String> = ["blocked", "waiting", "done", "failed"]
     static let attentionStates: Set<String> = ["blocked", "waiting"]
+    /// 「作業中」を表す状態。ここから idle へ遷移＝1ターン完了とみなして通知する。
+    static let activeStates: Set<String> = ["working", "busy"]
 
     private var lastStates: [String: String] = [:]
     private var seeded = false
@@ -109,8 +109,14 @@ final class SessionStore {
             seeded = true
         }
         guard seeded else { return }  // first run: seed only, no startup spam
-        for a in agents where Self.notifyStates.contains(a.state) {
-            if lastStates[a.id] != a.state { Notifier.fire(for: a) }
+        for a in agents {
+            let prev = lastStates[a.id]
+            guard prev != a.state else { continue }   // 状態が変わった瞬間だけ
+            if Self.notifyStates.contains(a.state) {
+                Notifier.fire(for: a)
+            } else if a.state == "idle", let prev, Self.activeStates.contains(prev) {
+                Notifier.fire(for: a)   // busy/working -> idle = 1ターン完了
+            }
         }
     }
 
