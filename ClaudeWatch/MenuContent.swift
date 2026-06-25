@@ -30,6 +30,15 @@ struct MenuContent: View {
 
         Divider()
         Button("開く") { openWindow(id: DashboardWindow.id) }
+
+        // ログイン時に自動起動。状態は SMAppService から読むので、システム設定側で
+        // 変えられても次に開いたとき正しく反映される。
+        let loginOn = LoginItem.shared.isEnabled
+        Toggle("ログイン時に起動", isOn: Binding(
+            get: { loginOn },
+            set: { LoginItem.shared.set($0) }
+        ))
+
         Button("終了") { NSApplication.shared.terminate(nil) }
     }
 

@@ -120,12 +120,66 @@ final class SessionStore {
         }
     }
 
+    /// ユーザーのログインシェルが組み立てる PATH。初回だけ実際にシェルを起動して解決し、
+    /// 以降はキャッシュを返す（解決は背景タスク上の `fetch()` から呼ばれる）。
+    ///
+    ///   • `$SHELL -ilc` で対話ログインシェルを起動し `.zshrc`/`.bashrc` まで読ませる。
+    ///     nvm・mise・volta・カスタム npm prefix など、PATH をそこで足す環境に追従できる。
+    ///   • rc がバナーを stdout に吐いても拾わないよう、PATH を番兵で挟んで切り出す。
+    ///   • 解決に失敗したら代表的なインストール先のフォールバックを使う。
+    nonisolated(unsafe) private static var cachedPath: String?
+    private static let pathLock = NSLock()
+
+    nonisolated private static func loginShellPath() -> String {
+        pathLock.lock(); defer { pathLock.unlock() }
+        if let cachedPath { return cachedPath }
+
+        let home = NSHomeDirectory()
+        let fallback = "\(home)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: shell)
+        proc.arguments = ["-ilc", #"printf '__CWPATH__%s__CWEND__' "$PATH""#]
+        let out = Pipe()
+        proc.standardOutput = out
+        proc.standardError = Pipe()
+
+        var resolved = fallback
+        do {
+            try proc.run()
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
+            let text = String(decoding: data, as: UTF8.self)
+            if let lo = text.range(of: "__CWPATH__"),
+               let hi = text.range(of: "__CWEND__"),
+               lo.upperBound <= hi.lowerBound {
+                let value = String(text[lo.upperBound..<hi.lowerBound])
+                if !value.isEmpty { resolved = value }
+            }
+        } catch {
+            NSLog("loginShellPath: \(shell) 起動失敗 \(error.localizedDescription) — fallback 使用")
+        }
+
+        cachedPath = resolved
+        return resolved
+    }
+
     /// Run `claude agents --json` and decode it. `nonisolated` so it can run on a
-    /// background task. Uses a login shell so `claude` (in ~/.local/bin) is found.
+    /// background task.
+    ///
+    /// PATH: Finder/Xcode から起動した GUI アプリはターミナルの PATH を継承しないため、
+    /// `claude`（nvm/mise/volta/`~/.local/bin` 等、人によって場所が違う）を素では見つけ
+    /// られない。そこで起動時にユーザーのログインシェルから PATH を一度だけ解決して
+    /// キャッシュし（VS Code などと同じ方式・`loginShellPath()`）、その PATH を環境に
+    /// 渡して claude を起動する。ポーリング毎の対話シェル起動コストは無い。
     nonisolated private static func fetch() -> Result<[AgentSession], PollError> {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        proc.arguments = ["-lc", "claude agents --json"]
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = loginShellPath()
+        proc.environment = env
+        proc.arguments = ["-c", "claude agents --json"]
         let out = Pipe()
         proc.standardOutput = out
         proc.standardError = Pipe()
