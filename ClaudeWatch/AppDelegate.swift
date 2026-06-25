@@ -24,6 +24,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse) async {
         let cwd = response.notification.request.content.userInfo["cwd"] as? String ?? ""
-        openInPhpStorm(cwd)
+        openInPhpStorm(cwd, fromNotification: true)
     }
 }

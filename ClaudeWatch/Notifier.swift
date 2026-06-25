@@ -39,6 +39,22 @@ enum Notifier {
 
 private let phpStormBundleID = "com.jetbrains.PhpStorm"
 
+/// 指定バンドルIDのアプリが最前面か。
+@MainActor private func isFrontmost(_ bundleID: String?) -> Bool {
+    NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleID
+}
+
+/// `ready()` が真になるまで 25ms 間隔でポーリングする（最大 timeout）。
+/// 毎回 `attempt()` を呼ぶ（activate などの副作用用。不要なら既定の空でよい）。
+@MainActor private func poll(timeout: Duration, attempt: () -> Void = {}, until ready: () -> Bool) async {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+        attempt()
+        if ready() { return }
+        try? await Task.sleep(for: .milliseconds(25))
+    }
+}
+
 /// 起動済みアプリを前面化し、実際に前面化した瞬間に一度だけ `onReady` を呼ぶ。
 /// AppKit の `didActivateApplicationNotification` を購読するイベント駆動。
 /// 通知が来ない場合に備えて 1 秒でタイムアウト発火する。発火後は購読を解除し、
@@ -91,15 +107,21 @@ private final class FrontmostActivation {
 /// Dock を跳ねさせないための要点：プロジェクト切替に使えるのは PhpStorm の
 /// ネイティブランチャ（`…/Contents/MacOS/phpstorm <path>`、コマンドサーバ経由）
 /// だけだが、これをバックグラウンドのアプリに対して叩くと「外部からの前面化」と
-/// なり跳ねる。そこで先にプロセス内でアプリ自身をアクティベート（跳ねない）して
-/// から、前面になった状態でランチャを実行する。
+/// なり跳ねる。そこで先にプロセス内でアプリ自身をアクティベートしてから、前面に
+/// なった状態でランチャを実行する。
 ///
-/// 動作は3分岐：
-///   - すでに PhpStorm が前面 → そのまま切替（跳ねず、切替フラッシュもなし）
-///   - 未起動 → ランチャで起動（初回のみ跳ねうるが許容）
-///   - 起動済みだが背面 → `activate()` し、前面化した瞬間（AppKit の
-///     didActivateApplication 通知）に切替。固定遅延のもたつきを避けるための
-///     イベント駆動。通知が来ない場合に備え 1 秒でタイムアウト発火する。
+/// 呼び出し元（fromNotification）で経路を分ける：
+///   通知クリック由来：クリックは直後（実測 ~25ms）に LSUIElement の ClaudeWatch を
+///     前面化し居座る。先に PhpStorm を activate するとこの前面化に上書きされ、
+///     ランチャの toFront と競合して跳ねる。そこで 2 段階にする：
+///       Phase1: ClaudeWatch が前面になった（=click の onset 完了）のを実測で待つ。
+///       Phase2: 後出しで PhpStorm を activate し、実際に frontmost になったことを
+///               実測確認してからランチャを叩く。
+///   メニュー/ダッシュボード由来（競合なし）：
+///     - すでに PhpStorm が前面 → そのまま切替（跳ねず、フラッシュもなし）
+///     - 未起動 → ランチャで起動（初回のみ跳ねうるが許容）
+///     - 起動済みだが背面 → activate し、前面化した瞬間（didActivateApplication
+///       通知）に切替。通知が来ない場合に備え 1 秒でタイムアウト発火する。
 ///
 /// （`open -b <bundleId> <folder>` は跳ねないが目的プロジェクトへ切り替わらず
 /// 不採用。NSWorkspace.open([folderURL]) はフォルダをドキュメント扱いし
@@ -107,7 +129,7 @@ private final class FrontmostActivation {
 /// ウィンドウを Accessibility にまともに公開しないため、AX 経由で特定
 /// プロジェクトの窓を選ぶ方法も採れない。）
 @MainActor
-func openInPhpStorm(_ cwd: String) {
+func openInPhpStorm(_ cwd: String, fromNotification: Bool = false) {
     guard !cwd.isEmpty,
           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: phpStormBundleID),
           let launcher = Bundle(url: appURL)?.executableURL
@@ -120,8 +142,29 @@ func openInPhpStorm(_ cwd: String) {
         try? proc.run()
     }
 
-    // すでに前面なら跳ねないので即切替（フラッシュなし）。
-    if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == phpStormBundleID {
+    // 通知クリック経路。クリックは直後（実測 ~25ms）に ClaudeWatch（LSUIElement）を
+    // 前面化し居座る。先に PhpStorm を activate すると上書きされ、ランチャの toFront と
+    // 競合して跳ねる。そこで「ClaudeWatch が前面になった（onset 完了）のを待ってから、
+    // 後出しで PhpStorm を前面化」する。
+    if fromNotification {
+        guard let running = NSRunningApplication.runningApplications(withBundleIdentifier: phpStormBundleID).first else {
+            switchProject()          // 未起動ならランチャで起動
+            return
+        }
+        let selfID = Bundle.main.bundleIdentifier
+        Task { @MainActor in
+            // Phase1: クリックによる ClaudeWatch 前面化(onset)を待つ。
+            await poll(timeout: .milliseconds(500)) { isFrontmost(selfID) }
+            // Phase2: 後出しで PhpStorm を前面化し、実測確認してからランチャ。
+            await poll(timeout: .milliseconds(1000), attempt: { running.activate() }) { isFrontmost(phpStormBundleID) }
+            switchProject()
+        }
+        return
+    }
+
+    // メニュー/ダッシュボード経路（通知のような競合なし）。
+    // すでに前面なら即切替（フラッシュなし）。
+    if isFrontmost(phpStormBundleID) {
         switchProject()
         return
     }
@@ -130,6 +173,6 @@ func openInPhpStorm(_ cwd: String) {
         switchProject()
         return
     }
-    // 起動済みだが背面：アクティベート（跳ねない）→ 前面化通知を受けて切替。
+    // 起動済みだが背面：アクティベート→前面化通知で切替。
     FrontmostActivation.activate(running, then: switchProject)
 }
