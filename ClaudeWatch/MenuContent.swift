@@ -29,7 +29,7 @@ struct MenuContent: View {
         }
 
         Divider()
-        Button("開く") { openWindow(id: DashboardWindow.id) }
+        Button("開く") { openDashboard() }
 
         // ログイン時に自動起動。状態は SMAppService から読むので、システム設定側で
         // 変えられても次に開いたとき正しく反映される。
@@ -40,6 +40,26 @@ struct MenuContent: View {
         ))
 
         Button("終了") { NSApplication.shared.terminate(nil) }
+    }
+
+    /// ダッシュボードを開く（前面化）。
+    ///
+    /// openWindow(id:) はウィンドウが未生成なら作るが、既に開いている場合は
+    /// 何もしない＝同じ Space にいると無反応になる。そこで:
+    ///   • アプリをアクティブ化し、
+    ///   • 既存ウィンドウがあれば makeKeyAndOrderFront で最前面に出す
+    ///     （別 Space にあるとそのウィンドウのある Space＝デスクトップへ切り替わる）。
+    ///   • まだ無ければ openWindow で新規生成する。
+    private func openDashboard() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let win = NSApp.windows.first(where: {
+            $0.identifier?.rawValue.contains(DashboardWindow.id) == true
+                || $0.title == "ClaudeWatch"
+        }) {
+            win.makeKeyAndOrderFront(nil)
+        } else {
+            openWindow(id: DashboardWindow.id)
+        }
     }
 
     /// 「色付きの大文字ステータス」＋「通常色のプロジェクト名」を結合したタイトル。
