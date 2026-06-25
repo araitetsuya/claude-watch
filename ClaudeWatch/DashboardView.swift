@@ -16,6 +16,10 @@ struct DashboardView: View {
             header
             Divider()
             content
+                // 空状態（ContentUnavailableView）は固有サイズしか持たず広がらないため、
+                // 明示的に領域いっぱいに伸ばす。これがないとセッション無しの時だけ
+                // VStack が中央寄せになり、ヘッダーが下にズレる（List の時は上詰めになる）。
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
             legend
         }
