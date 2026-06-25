@@ -16,6 +16,8 @@ struct DashboardView: View {
             header
             Divider()
             content
+            Divider()
+            legend
         }
         .frame(minWidth: 420, minHeight: 480)
         .onAppear {
@@ -26,6 +28,25 @@ struct DashboardView: View {
         .onDisappear {
             NSApp.setActivationPolicy(.accessory)
         }
+    }
+
+    /// ステータス色の凡例。将来は設定画面へ移す予定（今はダッシュボード下部に仮置き）。
+    private var legend: some View {
+        let statuses = ["idle", "busy", "waiting", "working", "blocked", "done", "failed", "stopped"]
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("ステータス凡例").font(.caption2).foregroundStyle(.secondary)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), alignment: .leading)],
+                      alignment: .leading, spacing: 6) {
+                ForEach(statuses, id: \.self) { st in
+                    HStack(spacing: 6) {
+                        Circle().fill(AgentSession.statusColor(for: st)).frame(width: 9, height: 9)
+                        Text(st.uppercased()).font(.caption).bold()
+                            .foregroundStyle(AgentSession.statusColor(for: st))
+                    }
+                }
+            }
+        }
+        .padding(12)
     }
 
     private var header: some View {
@@ -61,11 +82,15 @@ struct DashboardView: View {
 
     private func row(_ s: AgentSession) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Circle().fill(s.statusColor).frame(width: 10, height: 10)
-                .padding(.top, 4)   // プロジェクト名の行に高さを合わせる
             VStack(alignment: .leading, spacing: 2) {
-                Text(s.project).font(.body).bold()
-                Text(s.detailText).font(.caption).foregroundStyle(.secondary)
+                // 1行目：大文字・色付きステータス ＋ プロジェクト名（メニューと統一）
+                HStack(spacing: 6) {
+                    Text(s.state.uppercased()).font(.body).bold().foregroundStyle(s.statusColor)
+                    Text(s.project).font(.body).bold()
+                }
+                if !s.subtitle.isEmpty {
+                    Text(s.subtitle).font(.caption).foregroundStyle(.secondary)
+                }
                 if !s.cwd.isEmpty {
                     Text(s.cwd).font(.caption2).foregroundStyle(.tertiary)
                 }
