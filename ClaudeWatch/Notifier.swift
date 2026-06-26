@@ -14,19 +14,19 @@ enum Notifier {
 
     static func fire(for a: AgentSession) {
         let content = UNMutableNotificationContent()
+        // title はプロジェクト名（通知一覧で一番目立つ位置）。body は状態の文章 1 行に
+        // まとめ、詳細（待ち理由 / セッション名）があるときだけ括弧で添える。
+        // アプリ名は OS が自動表示する。
+        content.title = a.project.isEmpty ? "Claude セッション" : a.project
         switch a.state {
         case "blocked", "waiting":
-            content.title = "⚠️ \(a.project) が待っています"
-            content.body = a.waitingFor.isEmpty ? "要対応（許可 / 入力）" : a.waitingFor
+            content.body = withDetail("確認待ちです", a.waitingFor)
         case "done":
-            content.title = "✅ \(a.project) 完了"
-            content.body = a.name.isEmpty ? "セッション完了" : a.name
+            content.body = withDetail("作業が完了しました", a.name)
         case "failed":
-            content.title = "❌ \(a.project) 失敗"
-            content.body = a.name.isEmpty ? "セッション失敗" : a.name
+            content.body = withDetail("作業が失敗しました", a.name)
         case "idle":
-            content.title = "💬 \(a.project) 応答完了"
-            content.body = "入力待ち（あなたの番）"
+            content.body = "応答が完了しました"
         default:
             return
         }
@@ -34,6 +34,11 @@ enum Notifier {
         content.userInfo = ["cwd": a.cwd]  // carried so a click can open the project
         let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(req)
+    }
+
+    /// 状態の文章に、詳細があれば「（詳細）」を添えて 1 行にまとめる。
+    private static func withDetail(_ base: String, _ detail: String) -> String {
+        detail.isEmpty ? base : "\(base)（\(detail)）"
     }
 }
 
