@@ -14,19 +14,22 @@ enum Notifier {
 
     static func fire(for a: AgentSession) {
         let content = UNMutableNotificationContent()
+        // title はプロジェクト名（通知一覧で一番目立つ位置）。subtitle に状態の文章、
+        // body に詳細（待ち理由 / セッション名）を置く。アプリ名は OS が自動表示する。
+        content.title = a.project.isEmpty ? "Claude セッション" : a.project
         switch a.state {
         case "blocked", "waiting":
-            content.title = "⚠️ \(a.project) が待っています"
-            content.body = a.waitingFor.isEmpty ? "要対応（許可 / 入力）" : a.waitingFor
+            content.subtitle = "確認待ちです"
+            content.body = a.waitingFor.isEmpty ? "許可または入力が必要です" : a.waitingFor
         case "done":
-            content.title = "✅ \(a.project) 完了"
-            content.body = a.name.isEmpty ? "セッション完了" : a.name
+            content.subtitle = "作業が完了しました"
+            content.body = a.name.isEmpty ? "セッションが完了しました" : a.name
         case "failed":
-            content.title = "❌ \(a.project) 失敗"
-            content.body = a.name.isEmpty ? "セッション失敗" : a.name
+            content.subtitle = "作業が失敗しました"
+            content.body = a.name.isEmpty ? "セッションが失敗しました" : a.name
         case "idle":
-            content.title = "💬 \(a.project) 応答完了"
-            content.body = "入力待ち（あなたの番）"
+            content.subtitle = "応答が完了しました"
+            content.body = "あなたの番です"
         default:
             return
         }
